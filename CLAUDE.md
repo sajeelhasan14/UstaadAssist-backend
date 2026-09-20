@@ -45,11 +45,14 @@ If a feature you are building would require the teacher to type a lot, stop and 
 | Mobile app | React Native (Expo) |
 | Navigation | React Navigation |
 | Backend | Node.js + Express.js, REST, JSON |
+| Language | **TypeScript.** Run directly by Node 22 via `--experimental-strip-types` — no build step, no `dist/`. `tsc --noEmit` type-checks only; it never emits. |
 | Database | PostgreSQL |
 | DB access | **Raw SQL via `pg`. No ORM. No Prisma, no Sequelize, no Knex.** |
+| Validation & API docs | Zod schema per endpoint → OpenAPI → Swagger UI at `/docs`. One definition yields request validation, TS types (`z.infer`), the docs, and the mock server. |
+| Testing | Node's built-in `node:test`. No Jest, no Vitest. |
 | Auth | Supabase Auth |
 | File storage | Supabase Storage |
-| Migrations | Plain numbered `.sql` files in `/server/migrations`, run manually |
+| Migrations | Plain numbered `.sql` files in `/migrations` (this backend repo *is* the server), run manually with `psql`. |
 | PDF generation | Tool not decided yet, but the feature is required and fully owned by the app. See Section 3.8. Leave a stub service with a clear interface until the tool is picked. |
 | Document extraction | Tool not decided yet. One vision-capable service handles both the course outline and the class list photo. Leave a stub with a clear interface. |
 
@@ -59,6 +62,8 @@ If a feature you are building would require the teacher to type a lot, stop and 
 - **Do not build authentication.** Supabase Auth issues the token. The Express side only *verifies* it: middleware reads the `Authorization: Bearer <token>` header, verifies the signature against the project JWKS endpoint (`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`) using `jose`, and attaches `req.auth`. That is the entire auth implementation. Do not verify with a shared JWT secret — the project uses asymmetric signing keys.
 - **Do not upload files through Express.** The app uploads directly to a Supabase Storage bucket and sends the returned path to the API, which saves it in the `material` table.
 - No secrets in the repo. `.env` is gitignored, and `.env.example` lists the keys.
+- **Dev tooling uses Node 22 built-ins.** `--watch` instead of `nodemon`, `--env-file` instead of `dotenv`. Do not add either package.
+- **The approved dependency list is closed.** Runtime: `express`, `pg`, `jose`, `zod`, `@asteasolutions/zod-to-openapi`, `swagger-ui-express`. Dev: `typescript`, `@types/*`. Anything else needs asking first.
 - The Supabase service role key lives on the server only. Never in the React Native app.
 
 ---
@@ -215,7 +220,12 @@ GET    /courses/:id/analysis/topics      topic-wise class performance
 POST   /courses/:id/materials            save material record after Supabase upload
 GET    /courses/:id/dashboard            every dashboard number in one response
 GET    /courses/:id/reports/:type.pdf    generate and return a report
+
+GET    /docs                             Swagger UI — generated, never hand-written
+GET    /openapi.json                     the OpenAPI spec, generated from the Zod schemas
 ```
+
+Every field name in requests and responses uses `snake_case`, matching the database columns, so no mapping layer exists between SQL and JSON. *(Pending final confirmation.)*
 
 Response shape, used everywhere:
 
@@ -268,3 +278,20 @@ Do not start a milestone before the previous one runs end to end.
 - No mock or placeholder data in application code. Seed data goes in a seed script.
 - When a task is ambiguous, ask one specific question rather than guessing and building the wrong thing.
 - After changing planner logic, run the planner tests before moving on.
+
+---
+
+## 8. Team context
+
+Four people. One backend (the lead), three on the React Native app, working in parallel.
+
+This changes the weight of one existing rule: **endpoint names and field names are frozen once published.** Three developers build against them. A rename that costs the backend two minutes costs the team an afternoon.
+
+How the two tracks stay in sync:
+
+- The **Swagger UI at `/docs`** is the contract. It is generated from the Zod schemas, so it cannot drift from the code. There is no separate document to keep updated.
+- The mobile track builds against a **mock server** generated from the same OpenAPI spec, then switches one base URL when the real endpoint lands.
+- If the app needs a field that does not exist, it is requested and added. It is never invented on the client.
+- **Weekly integration checkpoint:** the app runs against the real backend, not the mock.
+
+What the mobile track can build with no backend at all: the design system, navigation, Supabase sign-in and session persistence, and every screen layout. Supabase Auth runs in the app and does not touch Express.
