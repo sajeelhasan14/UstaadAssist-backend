@@ -1,6 +1,7 @@
 import express from "express";
-import { ok, notFound } from "./http.ts";
+import { ok } from "./http.ts";
 import { errorHandler, notFoundHandler } from "./middleware/error.ts";
+import authRoutes from "./routes/auth.ts";
 
 const app = express();
 
@@ -10,14 +11,7 @@ app.get("/health", (req, res) => {
   ok(res, { status: "ok" });
 });
 
-// Temporary — delete both after testing.
-app.get("/boom", (req, res) => {
-  throw new Error("kaboom");
-});
-
-app.get("/courses/:id", (req, res) => {
-  throw notFound("Course");
-});
+app.use("/auth", authRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
