@@ -2,6 +2,7 @@ import express from "express";
 import { ok } from "./http.ts";
 import { errorHandler, notFoundHandler } from "./middleware/error.ts";
 import authRoutes from "./routes/auth.ts";
+import courseRoutes from "./routes/courses.ts";
 
 const app = express();
 
@@ -12,6 +13,7 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/auth", authRoutes);
+app.use("/courses", courseRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
