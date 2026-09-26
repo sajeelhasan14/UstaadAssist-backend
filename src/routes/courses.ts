@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { ok, badRequest, notFound } from "../http.ts";
 import { requireAuth } from "../middleware/requireAuth.ts";
+import { holidaysBetween } from "../data/pakHolidays.ts";
 import { pool, transaction } from "../db/pool.ts";
 
 const router = Router();
@@ -16,21 +17,42 @@ router.post("/", requireAuth, async (req, res) => {
   if (!Array.isArray(class_days) || class_days.length === 0) {
     throw badRequest("class_days must be a non-empty array");
   }
-  const result = await pool.query(
-    `insert into course (teacher_id, name, code, semester, start_date, end_date, class_days)
-     values ($1, $2, $3, $4, $5, $6, $7)
-     returning *`,
-    [
-      req.auth!.userId,
-      name,
-      code ?? null,
-      semester ?? null,
-      start_date,
-      end_date,
-      class_days,
-    ],
-  );
-  ok(res, result.rows[0], 201);
+  const course = await transaction(async (client) => {
+    const created = await client.query(
+      `insert into course (teacher_id, name, code, semester, start_date, end_date, class_days)
+       values ($1, $2, $3, $4, $5, $6, $7)
+       returning *`,
+      [
+        req.auth!.userId,
+        name,
+        code ?? null,
+        semester ?? null,
+        start_date,
+        end_date,
+        class_days,
+      ],
+    );
+
+    const newCourse = created.rows[0];
+    const holidays = holidaysBetween(start_date, end_date);
+
+    if (holidays.length > 0) {
+      await client.query(
+        `insert into holiday (course_id, date, name)
+         select $1, d, n
+         from unnest($2::date[], $3::text[]) as t(d, n)`,
+        [
+          newCourse.id,
+          holidays.map((h) => h.date),
+          holidays.map((h) => h.name),
+        ],
+      );
+    }
+
+    return newCourse;
+  });
+
+  ok(res, course, 201);
 });
 
 // COURSE TOPICS CREATION

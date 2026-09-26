@@ -200,6 +200,7 @@ PATCH  /courses/:id                      edit course settings (attendance_thresh
 POST   /courses/:id/outline/import       upload outline file -> extracted topics for review
 POST   /courses/:id/students/extract     photo or PDF of the class list -> parsed rows for review (nothing saved)
 POST   /courses/:id/students/import      save the reviewed, confirmed student list
+GET    /courses/:id/holidays             preloaded holidays for the course, with their on/off state
 POST   /courses/:id/holidays             confirm / toggle preloaded holidays
 
 POST   /courses/:id/plan/generate        run the planner, create sessions
