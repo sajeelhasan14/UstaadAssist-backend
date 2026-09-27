@@ -193,6 +193,7 @@ GET    /auth/me                          signed-in teacher profile (sign-in itse
 
 POST   /courses                          create course
 GET    /courses                          list teacher's courses
+GET    /courses/:id                      one course with its topics and holidays
 POST   /courses/:id/clone                clone a previous semester's course
 POST   /courses/:id/topics               accepts a pasted block of lines
 PATCH  /topics/:id                       edit one topic (sessions_needed, min_sessions, priority, order_no)
@@ -211,6 +212,7 @@ POST   /courses/:id/plan/deficit/apply   apply the chosen option
 GET    /courses/:id/sessions             week-by-week plan
 PATCH  /sessions/:id                     mark conducted / cancelled
 POST   /sessions/:id/attendance          submit attendance
+GET    /sessions/:id/attendance          attendance already recorded, for the edit screen
 GET    /courses/:id/attendance/summary   percentages + below-threshold list
 
 POST   /courses/:id/assessments          create quiz / assignment / midterm / final
@@ -224,10 +226,12 @@ GET    /courses/:id/weightage             component percentages
 PUT    /courses/:id/weightage             edit them (must total 100)
 
 GET    /courses/:id/students             enrolled students with attendance percentage
+DELETE /courses/:id/students/:studentId  remove one student from this course (the student record is kept)
 GET    /students/:id                     one student: attendance record and marks
 
 POST   /courses/:id/materials            save material record after Supabase upload
 GET    /courses/:id/materials            list saved material records
+DELETE /materials/:id                    delete one material record (the app deletes the stored file)
 GET    /courses/:id/dashboard            every dashboard number in one response
 GET    /courses/:id/reports/:type.pdf    generate and return a report
 

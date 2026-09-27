@@ -2,6 +2,8 @@
 
 > The complete API. What each one takes, what it gives back, and which service does the work. This is the contract three mobile developers build against, so the names are frozen.
 
+This chapter is the reference in prose. The *live* version is the Swagger UI at `/docs`, which is generated from the code and therefore cannot be out of date — chapter 10 explains how that works.
+
 ## The rules that apply to all of them
 
 - *Every response* has the shape `{ success, data, message }`. No exceptions.
@@ -418,7 +420,22 @@ Note `res.send(pdf)` rather than `ok(res, pdf)`: a PDF is bytes, not JSON, so it
 
 ---
 
-## What is not in the contract
+## Four endpoints added after the original list
+
+The endpoint list in the project spec was written before the screens existed. Four were added while building, because a screen genuinely needed them:
+
+| Endpoint | Why |
+|---|---|
+| `GET /courses/{id}` | The setup screen needs the course, its topics and its holidays together |
+| `GET /sessions/{id}/attendance` | The attendance *edit* screen needs what was already recorded |
+| `DELETE /courses/{id}/students/{studentId}` | A student who dropped the course |
+| `DELETE /materials/{id}` | Removing an uploaded file's record |
+
+All four are in `/docs` and have been added to the endpoint list in the project spec, so the two agree exactly — 39 endpoints on each side, checked. None of them replaces or renames anything that was already published: they are additions, which is the safe direction.
+
+!NOTE This is the pattern to follow. If the app needs a field or an endpoint that does not exist, it is *requested and added*, never invented on the client. What must not happen is a rename: three developers are building against these names.
+
+## What is still not there
 
 Two gaps worth naming rather than quietly adding:
 

@@ -1,4 +1,4 @@
-# 10 · What is stubbed, and why
+# 11 · What is stubbed, and why
 
 > Two features are deliberately unfinished. Both are unfinished in the same careful way: everything except the tool is done, so finishing them changes one function each.
 
@@ -84,7 +84,7 @@ That is the spec's rule: *"Computation is a pure function, kept separate from PD
 
 PAGEBREAK
 
-# 11 · Seeding and smoke testing
+# 12 · Seeding and smoke testing
 
 > Two scripts that are not part of the server but are how you know it works.
 
@@ -237,17 +237,17 @@ Both are in this guide already, and both are the kind unit tests structurally ca
 
 ```
 npm run typecheck     # 0 errors
-npm test              # 55 passed
+npm test              # 74 passed  (55 planner/grading + 19 contract)
 npm run dev           # in one terminal
 npm run seed          # in another
-npm run smoke 8       # 33 passed
+npm run smoke 8       # 39 passed
 ```
 
-Current state: type-check clean, 55 unit tests passing, 33 endpoints answering correctly against a real PostgreSQL database and real Supabase tokens.
+Current state: type-check clean, 74 unit tests passing, 39 endpoint checks answering correctly against a real PostgreSQL database and real Supabase tokens.
 
 PAGEBREAK
 
-# 12 · Quick reference
+# 13 · Quick reference
 
 > The things worth having at hand — for a viva, or for picking the project back up in three months.
 
@@ -292,10 +292,10 @@ Every query that takes an id from the URL also filters on `teacher_id` from the 
 | | |
 |---|---|
 | Tables | 16 across 2 migrations |
-| Endpoints | 33 |
-| Runtime dependencies | 6 |
+| Endpoints | 40, all documented at `/docs` |
+| Runtime dependencies | 9 |
 | Pure planner files | 6, with no database access |
-| Tests | 55, running in about 300ms |
+| Tests | 74, running in about 400ms |
 | Lines of SQL written by a library | 0 |
 
 ## Where to look for what
@@ -310,6 +310,7 @@ Every query that takes an id from the URL also filters on `teacher_id` from the 
 | Add an endpoint | the matching file in `src/routes/`, then a service |
 | Change the error format | `src/middleware/error.ts`, and nowhere else |
 | Change the response envelope | `src/http.ts`, and nowhere else |
+| Add or change an endpoint's docs | `src/openapi/contract.ts` — the docs and validation both follow |
 | Add a table | a new numbered file in `migrations/` |
 | Change the demo | `scripts/seed.ts` |
 

@@ -69,6 +69,11 @@ check 200 GET  /health
 check 200 GET  /auth/me
 
 echo ""
+echo "the contract itself (no token needed - the app team reads these first)"
+check 200 GET  /openapi.json
+check 200 GET  /docs/
+
+echo ""
 echo "rejections (these SHOULD fail)"
 # No token at all.
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/auth/me")
@@ -85,6 +90,11 @@ check 404 GET  /courses/999999
 check 400 PUT  "/courses/$COURSE/weightage" '{"quiz":10,"final":10}'
 # A body that is not valid JSON must be a 400, not a 500.
 check 400 POST "/courses/$COURSE/materials" '{"title": broken}'
+# Schema validation, from the same contract that generates the docs.
+check 400 PATCH "/courses/$COURSE" '{}'
+check 400 POST "/courses" '{"name":"X","start_date":"01-09-2026","end_date":"2026-12-18","class_days":["mon"]}'
+check 400 POST "/courses/$COURSE/assessments" '{"type":"pop-quiz","title":"X","total_marks":10}'
+check 400 GET  "/courses/$COURSE/dashboard?today=tomorrow"
 
 echo ""
 echo "courses and setup"

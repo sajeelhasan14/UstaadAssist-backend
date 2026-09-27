@@ -26,6 +26,7 @@ Its job is exactly four things:
 - *Run the planner.* Take the course setup, compute the timetable, save it, and recompute it when things change.
 - *Compute the results.* Take the marks and the weightage, compute every student's weighted total and letter grade, and produce the report data.
 - *Check who is asking.* Every request must carry a valid token, and a teacher can only ever see their own courses.
+- *Publish its own contract.* The browsable docs at `/docs` are generated from the code, so the mobile team always has an accurate specification to build against.
 
 And two things it is explicitly *not* responsible for:
 
@@ -92,7 +93,8 @@ Every feature in this backend follows that same shape: *route → service → (p
 | `services/` | `src/services/` | Load data, call the planner, save the result | *Yes* — this is the only place that does |
 | `planner/` | `src/planner/` | Compute the timetable. Pure calculation | *No, never* |
 | `grading/` | `src/grading/` | Compute results and grades. Pure calculation | *No, never* |
-| `middleware/` | `src/middleware/` | Run before or after every route: auth, errors | No |
+| `middleware/` | `src/middleware/` | Run before or after every route: auth, validation, errors | No |
+| `openapi/` | `src/openapi/` | The API contract: the docs and the validation both read it | No |
 
 The important line in that table is the one that appears twice: *the planner and the grading engine never touch the database.* They take data as arguments and return data. Nothing else.
 
@@ -116,8 +118,11 @@ PAGEBREAK
 | PostgreSQL | 17.6 | The database, hosted on Supabase |
 | `pg` | 8.23 | The PostgreSQL driver. Sends SQL, returns rows |
 | `jose` | 6.2 | Verifies the signature on Supabase's tokens |
+| `zod` | 4.6 | Describes every request and response shape, once |
+| `@asteasolutions/zod-to-openapi` | 9.1 | Turns those Zod schemas into the OpenAPI spec |
+| `swagger-ui-express` | 5.0 | Serves the browsable docs at `/docs` |
 
-That is the entire runtime dependency list. Six packages.
+That is the entire runtime dependency list. Nine packages.
 
 ### Three deliberate absences
 
@@ -133,10 +138,11 @@ That is the entire runtime dependency list. Six packages.
 |---|---|
 | `npm run dev` | Start the server and restart on every save |
 | `npm start` | Start the server once |
-| `npm test` | Run all 55 planner and grading tests |
+| `npm test` | Run all 74 tests (planner, grading and the API contract) |
 | `npm run typecheck` | Check the types without running anything |
 | `npm run seed` | Build a full realistic demo semester in the database |
-| `npm run smoke` | Call all 33 endpoints once and print the status codes |
+| `npm run smoke` | Call every endpoint once and print the status codes |
+| `npm run openapi` | Write the OpenAPI spec to `docs/openapi.json` |
 
 The first time on a new machine, in order:
 
@@ -184,6 +190,7 @@ Every file in the project, with one line on what it does. The chapters after thi
 | `src/db/pool.ts` | The database connection pool and `transaction()` | 5 |
 | `src/middleware/requireAuth.ts` | Verifies the Supabase token | 4 |
 | `src/middleware/error.ts` | The only place that sends an error response | 5 |
+| `src/middleware/validate.ts` | Checks every request against the contract | 10 |
 
 ### The pure calculation — the graded core
 
@@ -196,6 +203,16 @@ Every file in the project, with one line on what it does. The chapters after thi
 | `src/planner/deficit.ts` | Computes the three ways out of a shortage | 6 |
 | `src/planner/health.ts` | How many weeks behind the teacher is | 6 |
 | `src/grading/compute.ts` | Weighted totals and letter grades | 7 |
+
+### The API contract — one definition, four consumers
+
+| File | What it does | Chapter |
+|---|---|---|
+| `src/openapi/zod.ts` | Zod with `.openapi()` added, set up once | 10 |
+| `src/openapi/schemas.ts` | Every shape the API returns | 10 |
+| `src/openapi/requests.ts` | Every shape the API accepts | 10 |
+| `src/openapi/contract.ts` | The list of all 40 endpoints | 10 |
+| `src/openapi/document.ts` | Generates the OpenAPI spec from that list | 10 |
 
 ### The services — the only code that touches the database
 
@@ -211,7 +228,7 @@ Every file in the project, with one line on what it does. The chapters after thi
 | `src/services/material.service.ts` | Course material records | 8 |
 | `src/services/dashboard.service.ts` | Every dashboard number in one response | 8 |
 | `src/services/report.service.ts` | Assembles the three reports | 8 |
-| `src/services/extraction.service.ts` | Reads a class-list photo — *stub* | 10 |
+| `src/services/extraction.service.ts` | Reads a class-list photo — *stub* | 11 |
 
 ### The routes
 
@@ -225,6 +242,7 @@ Every file in the project, with one line on what it does. The chapters after thi
 | `src/routes/assessments.ts` | `/assessments` | 9 |
 | `src/routes/students.ts` | `/students` | 9 |
 | `src/routes/materials.ts` | `/materials` | 9 |
+| *(mounted in `index.ts`)* | `/docs` and `/openapi.json` | 10 |
 
 ### Everything else
 
@@ -236,6 +254,8 @@ Every file in the project, with one line on what it does. The chapters after thi
 | `tests/planner.test.ts` | 20 tests for slots, allocation and quiz dates |
 | `tests/replan.test.ts` | 20 tests for replanning, deficit and health |
 | `tests/grading.test.ts` | 15 tests for result computation |
+| `tests/contract.test.ts` | 19 tests that the docs match the routes that exist |
 | `scripts/seed.ts` | Builds a realistic full-semester demo course |
 | `scripts/create-demo-user.ts` | Creates a login through the Supabase Admin API |
 | `scripts/smoke.sh` | Calls every endpoint once and checks the status code |
+| `scripts/export-openapi.ts` | Writes the spec to `docs/openapi.json` for the app team |
