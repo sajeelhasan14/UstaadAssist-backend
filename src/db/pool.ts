@@ -1,12 +1,5 @@
 import { Pool, type PoolClient } from "pg";
-
-/**
- * Are we running as a serverless function rather than a long-lived server?
- *
- * Vercel sets VERCEL=1 in every deployment. This matters because the two
- * environments want opposite things from a connection pool.
- */
-const isServerless = process.env.VERCEL === "1" || process.env.VERCEL === "true";
+import { env, isServerless } from "../env.ts";
 
 /**
  * The connection pool.
@@ -29,7 +22,7 @@ const isServerless = process.env.VERCEL === "1" || process.env.VERCEL === "true"
  * for a server, wrong for functions that come and go. See DEPLOYMENT.md.
  */
 export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: env.DATABASE_URL,
   max: isServerless ? 1 : 10,
   idleTimeoutMillis: isServerless ? 10_000 : 30_000,
   // Fail fast rather than hanging a request for the platform's whole timeout.

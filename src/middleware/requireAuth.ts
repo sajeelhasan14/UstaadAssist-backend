@@ -1,9 +1,10 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import { env } from "../env.ts";
 import type { NextFunction, Request, Response } from "express";
 import { unauthorized } from "../http.ts";
 
 const jwks = createRemoteJWKSet(
-  new URL(`${process.env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`),
+  new URL(`${env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`),
 );
 
 declare global {

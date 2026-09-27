@@ -19,6 +19,10 @@
  * serverless platform invokes. So nothing here has to know which one it is.
  */
 
+// FIRST, so a missing variable is reported by name instead of surfacing later as
+// a cryptic "Invalid URL" while some other module is loading.
+import "./env.ts";
+
 import express from "express";
 import swaggerUi from "swagger-ui-express";
 import { ok } from "./http.ts";

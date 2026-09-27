@@ -76,11 +76,17 @@ Nothing secret is in the repo — `.env` is gitignored, so it is never uploaded.
 Add these in **Project → Settings → Environment Variables**, for both the
 Production and Preview environments:
 
-| Variable | Value | Notes |
+| Variable | Required by the server? | Notes |
 |---|---|---|
-| `DATABASE_URL` | the **6543** connection string | Full read/write on the database |
-| `SUPABASE_URL` | `https://<project>.supabase.co` | Public, safe |
-| `SUPABASE_SERVICE_ROLE_KEY` | the service role key | Total-compromise secret. Server only — never in the React Native app |
+| `DATABASE_URL` | **Yes** | the **6543** connection string |
+| `SUPABASE_URL` | **Yes** | `https://<project>.supabase.co`. Public, safe |
+| `SUPABASE_SERVICE_ROLE_KEY` | **No** | Only the scripts in `scripts/` use it, and those run on your machine. Leave it off Vercel — it grants full admin on the Supabase project, so fewer places is better |
+
+If either required variable is missing the app cannot start, and **every** request
+fails with `FUNCTION_INVOCATION_FAILED` — including `/health`, which touches
+nothing. That is because both are read while modules are still loading, not inside
+a request. `src/env.ts` checks for them first and names the missing ones in the
+Vercel log.
 
 **Do not set `PORT`.** Vercel manages it, and `src/index.ts` (the file that reads
 `PORT`) is not used there at all.
@@ -218,6 +224,33 @@ connection each, and ten instances use ten connections rather than a hundred.
 The Swagger assets were not included. Check `vercel.json` still has the
 `includeFiles` line, and that the deployment picked it up — `vercel.json` changes
 need a redeploy.
+
+### Every request returns `FUNCTION_INVOCATION_FAILED`, even `/health`
+
+The app is crashing while it loads, before Express handles anything — so this is
+never a routing problem.
+
+Almost always a missing environment variable. `DATABASE_URL` and `SUPABASE_URL`
+are read at module load, so without them the app cannot start at all. Check the
+Vercel log: `src/env.ts` prints which ones are missing.
+
+Remember to **redeploy** after adding them. Adding a variable does not update a
+deployment that already exists.
+
+If the log instead says `ERR_MODULE_NOT_FOUND: Cannot find module
+'/var/task/src/app.ts'`, see the next entry.
+
+### `ERR_MODULE_NOT_FOUND` for a `.ts` file
+
+Locally, Node runs the `.ts` files as they are. Vercel does not: it converts each
+one to JavaScript first, so `src/app.ts` is deployed as `src/app.js`. Our imports
+are written with `.ts` on the end (`import app from "../src/app.ts"`), and if
+that text is copied across unchanged, Node looks for a file that is not there.
+
+`"rewriteRelativeImportExtensions": true` in `tsconfig.json` is what prevents
+this. It tells TypeScript to change `./x.ts` to `./x.js` in every relative import
+while converting. **Do not remove it.** It has no effect on `npm run dev`, which
+never reads `tsconfig.json`.
 
 ### `too many clients already`
 
