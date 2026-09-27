@@ -1,3 +1,5 @@
 node_modules/
 .env
 *.log
+# Real class lists and outlines used to tune the scanner (contain student data)
+samples/

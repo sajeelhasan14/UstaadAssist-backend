@@ -54,7 +54,7 @@ If a feature you are building would require the teacher to type a lot, stop and 
 | File storage | Supabase Storage |
 | Migrations | Plain numbered `.sql` files in `/migrations` (this backend repo *is* the server), run manually with `psql`. |
 | PDF generation | Tool not decided yet, but the feature is required and fully owned by the app. See Section 3.8. Leave a stub service with a clear interface until the tool is picked. |
-| Document extraction | Tool not decided yet. One vision-capable service handles both the course outline and the class list photo. Leave a stub with a clear interface. |
+| Document extraction | Free and self-hosted, no paid service. PDFs are read from their text with `unpdf` (exact); photos with Tesseract OCR (`tesseract.js`), read several ways and merged by voting. Parsing rules are pure functions in `src/extraction/`, tuned to the Department of Computer Science (University of Karachi) class list sheet — seat numbers `EB` + 11 digits. The server fetches uploads from Storage with the teacher's own token (`SUPABASE_ANON_KEY` needed). Real sample files live in the gitignored `samples/`. |
 
 ### Hard constraints
 
@@ -63,7 +63,7 @@ If a feature you are building would require the teacher to type a lot, stop and 
 - **Do not upload files through Express.** The app uploads directly to a Supabase Storage bucket and sends the returned path to the API, which saves it in the `material` table.
 - No secrets in the repo. `.env` is gitignored, and `.env.example` lists the keys.
 - **Dev tooling uses Node 22 built-ins.** `--watch` instead of `nodemon`, `--env-file` instead of `dotenv`. Do not add either package.
-- **The approved dependency list is closed.** Runtime: `express`, `pg`, `jose`, `zod`, `@asteasolutions/zod-to-openapi`, `swagger-ui-express`. Dev: `typescript`, `@types/*`. Anything else needs asking first.
+- **The approved dependency list is closed.** Runtime: `express`, `pg`, `jose`, `zod`, `@asteasolutions/zod-to-openapi`, `swagger-ui-express`, `unpdf`, `tesseract.js` (the last two for document extraction, approved by the project owner). Dev: `typescript`, `@types/*`. Anything else needs asking first.
 - The Supabase service role key lives on the server only. Never in the React Native app.
 
 ---

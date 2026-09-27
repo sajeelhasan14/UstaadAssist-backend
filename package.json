@@ -23,6 +23,8 @@
     "jose": "^6.2.12",
     "pg": "^8.23.0",
     "swagger-ui-express": "^5.0.1",
+    "tesseract.js": "^7.0.0",
+    "unpdf": "^1.8.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {

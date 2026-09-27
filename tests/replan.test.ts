@@ -117,6 +117,84 @@ test("a cancelled class frees nothing but pushes the rest later", () => {
   assert.equal(after.sessions[1]!.date, "2026-09-21", "topic 2 slipped a week");
 });
 
+test("a class cancelled on a future date is not rebuilt onto that same date", () => {
+  // Today is 7 Sep. The teacher cancels next Monday's class (14 Sep) in advance.
+  const result = replan({
+    today: "2026-09-07",
+    startDate: "2026-09-01",
+    endDate: "2026-10-31",
+    classDays: ["mon"],
+    holidays: [],
+    existingSessions: [
+      session({ id: 1, date: "2026-09-07", status: "planned", topic_id: 1 }),
+      session({ id: 2, date: "2026-09-14", status: "cancelled", topic_id: 2 }),
+      session({ id: 3, date: "2026-09-21", status: "planned", topic_id: 3 }),
+    ],
+    topics: [
+      topic({ id: 1, order_no: 1 }),
+      topic({ id: 2, order_no: 2 }),
+      topic({ id: 3, order_no: 3 }),
+    ],
+  });
+
+  assert.ok(
+    !result.sessions.some((s) => s.date === "2026-09-14"),
+    "nothing is scheduled on the cancelled date",
+  );
+  assert.deepEqual(
+    result.sessions.map((s) => [s.date, s.topic_id]),
+    [
+      ["2026-09-07", 1],
+      ["2026-09-21", 2],
+      ["2026-09-28", 3],
+    ],
+    "the cancelled topic takes the next class and everything after it slips a week",
+  );
+});
+
+test("a cancelled class is reported as moved from its date, not as a new class", () => {
+  const topics = [topic({ id: 1, order_no: 1 }), topic({ id: 2, order_no: 2, title: "Joins" }), topic({ id: 3, order_no: 3 })];
+
+  // Today is 7 Sep; the 14 Sep class (Joins) has just been cancelled.
+  const first = replan({
+    today: "2026-09-07",
+    startDate: "2026-09-01",
+    endDate: "2026-10-31",
+    classDays: ["mon"],
+    holidays: [],
+    existingSessions: [
+      session({ id: 1, date: "2026-09-07", status: "planned", topic_id: 1 }),
+      session({ id: 2, date: "2026-09-14", status: "cancelled", topic_id: 2 }),
+      session({ id: 3, date: "2026-09-21", status: "planned", topic_id: 3 }),
+    ],
+    topics,
+  });
+
+  const joins = first.changes.find((c) => c.topic_id === 2);
+  assert.deepEqual(joins, { kind: "moved", topic_id: 2, topic: "Joins", from: "2026-09-14", to: "2026-09-21" });
+  assert.ok(!first.changes.some((c) => c.kind === "added"), "nothing reads as brand new");
+
+  // Replanning again without any new disruption reports no changes at all —
+  // the cancellation was already accounted for.
+  const second = replan({
+    today: "2026-09-07",
+    startDate: "2026-09-01",
+    endDate: "2026-10-31",
+    classDays: ["mon"],
+    holidays: [],
+    existingSessions: [
+      session({ id: 1, date: "2026-09-07", status: "planned", topic_id: 1 }),
+      session({ id: 2, date: "2026-09-14", status: "cancelled", topic_id: 2 }),
+      ...first.sessions
+        .filter((s) => s.date !== "2026-09-07")
+        .map((s, i) => session({ id: 10 + i, date: s.date, status: "planned", topic_id: s.topic_id })),
+    ],
+    topics,
+  });
+
+  assert.deepEqual(second.changes, []);
+});
+
 test("the result reports what moved", () => {
   const result = replan({
     today: "2026-09-07",

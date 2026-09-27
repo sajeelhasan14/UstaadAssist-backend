@@ -53,7 +53,10 @@ router.post("/", requireAuth, async (req, res) => {
     const created = await client.query(
       `insert into course (teacher_id, name, code, semester, start_date, end_date, class_days)
        values ($1, $2, $3, $4, $5, $6, $7)
-       returning *`,
+       returning id, name, code, semester,
+                 to_char(start_date, 'YYYY-MM-DD') as start_date,
+                 to_char(end_date,   'YYYY-MM-DD') as end_date,
+                 class_days, attendance_threshold`,
       [
         req.auth!.userId,
         name,
@@ -81,7 +84,8 @@ router.post("/", requireAuth, async (req, res) => {
       );
     }
 
-    return newCourse;
+    // numeric arrives from pg as a string ("75.00"); the contract says number.
+    return { ...newCourse, attendance_threshold: Number(newCourse.attendance_threshold) };
   });
 
   ok(res, course, 201);
@@ -140,8 +144,8 @@ router.get("/:courseId/holidays", requireAuth, async (req, res) => {
   if (course.rowCount === 0) throw notFound("Course");
 
   const result = await pool.query(
-    `select id, date, name, is_active, source
-     from holiday where course_id = $1 order by date`,
+    `select id, to_char(date, 'YYYY-MM-DD') as date, name, is_active, source
+     from holiday where course_id = $1 order by holiday.date`,
     [req.params.courseId],
   );
 
@@ -176,7 +180,7 @@ router.post("/:courseId/holidays", requireAuth, async (req, res) => {
      set is_active = v.is_active
      from unnest($2::bigint[], $3::boolean[]) as v(id, is_active)
      where h.id = v.id and h.course_id = $1
-     returning h.id, h.date, h.name, h.is_active, h.source`,
+     returning h.id, to_char(h.date, 'YYYY-MM-DD') as date, h.name, h.is_active, h.source`,
     [
       req.params.courseId,
       holidays.map((h) => h.id),
@@ -231,13 +235,14 @@ router.post("/:courseId/outline/import", requireAuth, async (req, res) => {
     throw badRequest("storage_path is required — upload the file to Supabase Storage first");
   }
 
+  // class_days turns "Week 3–4" in the outline into a number of classes.
   const course = await pool.query(
-    "select id from course where id = $1 and teacher_id = $2",
+    "select id, class_days from course where id = $1 and teacher_id = $2",
     [courseId, req.auth!.userId],
   );
   if (course.rowCount === 0) throw notFound("Course");
 
-  const extracted = await extractTopics(storagePath);
+  const extracted = await extractTopics(storagePath, req.auth!, course.rows[0].class_days.length);
 
   ok(res, {
     ...extracted,
@@ -270,7 +275,7 @@ router.post("/:courseId/students/extract", requireAuth, async (req, res) => {
   );
   if (course.rowCount === 0) throw notFound("Course");
 
-  const extracted = await extractStudents(storagePath);
+  const extracted = await extractStudents(storagePath, req.auth!);
 
   ok(res, {
     ...extracted,

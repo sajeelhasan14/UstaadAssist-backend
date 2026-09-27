@@ -10,7 +10,8 @@
 
   "functions": {
     "api/index.ts": {
-      "includeFiles": "node_modules/swagger-ui-dist/**"
+      "includeFiles": "node_modules/{swagger-ui-dist,tesseract.js,tesseract.js-core}/**",
+      "maxDuration": 60
     }
   }
 }

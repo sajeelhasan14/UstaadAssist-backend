@@ -281,7 +281,9 @@ export function replan(input: ReplanInput): ReplanResult {
   const frozen = existingSessions.filter((s) => s.status === "conducted");
   const oldPlanned = existingSessions.filter((s) => s.status === "planned");
 
-  const taken = new Set(frozen.map((s) => s.date));
+  const taken = new Set(
+    existingSessions.filter((s) => s.status !== "planned").map((s) => s.date),
+  );
   const futureFrom = today > startDate ? today : startDate;
 
   const regular = generateSlots(futureFrom, endDate, classDays, holidays);
@@ -308,7 +310,7 @@ export function replan(input: ReplanInput): ReplanResult {
 Reading the important lines:
 
 - `futureFrom = today > startDate ? today : startDate` — if the semester has not started yet, rebuild from the start date rather than from today. Without this, replanning a future course would throw away the first weeks.
-- `taken` and the `.filter((s) => !taken.has(s.date))` — a date that already holds a conducted class is removed from the available slots, so the rebuild cannot schedule a second class on top of a class that already happened.
+- `taken` and the `.filter((s) => !taken.has(s.date))` — a date that already holds a conducted or cancelled class is removed from the available slots. A conducted date is used up; a cancelled date is a day the class could not happen. Without the cancelled half, cancelling next Monday's class and replanning would put the same topic straight back on next Monday and nothing would move.
 - `extraDates.filter((d) => d >= futureFrom ...)` — a makeup date in the past is not a future slot.
 
 ### `remainingWork` — how much of each topic is still owed

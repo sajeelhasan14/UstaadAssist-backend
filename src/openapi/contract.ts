@@ -299,11 +299,11 @@ export const CONTRACT: EndpointDef[] = [
     tag: "Students",
     summary: "Read a class-list photo or PDF (nothing is saved)",
     description:
-      "Upload the photo to Supabase Storage first and send the path. Returns a DRAFT for the review screen and writes nothing — saved is always false.\n\nThe review screen is mandatory. Printed roll numbers misread easily (CT-21001 vs CT-2100I) and a wrong one silently corrupts that student's attendance and result for the whole semester. Once the teacher has fixed it, post the confirmed rows to /students/import.\n\nCurrently returns 503: the extraction tool is not chosen yet. Use the manual entry path on the review screen meanwhile.",
+      "Upload the photo to Supabase Storage first and send the path. Returns a DRAFT for the review screen and writes nothing — saved is always false.\n\nThe review screen is mandatory. Printed roll numbers misread easily (CT-21001 vs CT-2100I) and a wrong one silently corrupts that student's attendance and result for the whole semester. Once the teacher has fixed it, post the confirmed rows to /students/import.\n\nA PDF is read from its text (exact). A photo is read with Tesseract OCR several ways and the readings vote; any row they disagree on comes back with confidence below 0.8 so the review screen flags it. Upload under \"<user id>/...\" — the server fetches the file with the caller's own token. 422 when no seat numbers are found; 503 when SUPABASE_ANON_KEY is not configured.",
     params: R.CourseIdParam,
     body: R.StoragePathBody,
     response: S.ExtractedStudentRows,
-    errors: [503],
+    errors: [415, 422, 502, 503],
   },
   {
     method: "post",
@@ -328,11 +328,11 @@ export const CONTRACT: EndpointDef[] = [
     tag: "Topics",
     summary: "Read a course outline file into topics for review",
     description:
-      "Same two-step shape as the class list: this returns extracted topics and saves nothing. Show them for review, then post the confirmed titles to /courses/{courseId}/topics.\n\nCurrently returns 503: the extraction tool is not chosen yet.",
+      "Same two-step shape as the class list: this returns extracted topics and saves nothing. Show them for review, then post the confirmed titles to /courses/{courseId}/topics.\n\nTopics are recognised when listed by week or lecture (\"Week 3-4: Normalization\") or as a numbered list; exams, quizzes and holidays are skipped. sessions_needed is filled only when the outline states a length — a week range is multiplied by the course's classes per week. 422 when no topics are found; 503 when SUPABASE_ANON_KEY is not configured.",
     params: R.CourseIdParam,
     body: R.StoragePathBody,
     response: S.ExtractedTopicRows,
-    errors: [503],
+    errors: [415, 422, 502, 503],
   },
   {
     method: "get",

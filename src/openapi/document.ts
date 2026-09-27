@@ -42,6 +42,9 @@ const COMMON_ERRORS: Record<number, string> = {
   401: "No token, or a token that does not verify.",
   404: "Does not exist — or belongs to another teacher. Both answer 404 on purpose: a 403 would confirm the id is real.",
   409: "Would duplicate a row that already exists.",
+  415: "The uploaded file is not a type that can be read. Send a PDF, or a JPG or PNG photo.",
+  422: "The file was read, but nothing usable was found in it. The message says what was expected.",
+  502: "Supabase Storage could not be reached to fetch the uploaded file.",
   500: "A bug on our side. The real error is in the server log, never in the response.",
   503: "The feature exists but its tool is not configured yet. The message names the workaround.",
 };
@@ -172,9 +175,10 @@ export function buildDocument() {
       ].join("\n"),
       contact: { name: "Backend" },
     },
-    servers: [
-      { url: "http://localhost:4000", description: "Local development" },
-    ],
+    // "/" means "whichever server is showing these docs". A fixed address such as
+    // http://localhost:4000 made the Swagger page on Vercel send every request to
+    // the viewer's own computer, which fails with "Failed to fetch".
+    servers: [{ url: "/", description: "This server" }],
     tags: [
       { name: "Health", description: "Is the server up" },
       { name: "Auth", description: "The signed-in teacher. Sign-in itself is Supabase, in the app." },
