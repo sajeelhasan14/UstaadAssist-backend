@@ -36,6 +36,40 @@ function pretty(iso: string): string {
 }
 
 /**
+ * The first class date strictly AFTER `date`, or null if there is none.
+ *
+ * Binary search. The slots are in date order (generateSlots() walks the
+ * calendar forwards, and mergeExtraDates() sorts), so there is no need to check
+ * them one by one from the start. Look at the middle slot instead:
+ *
+ *   - middle is on or before `date`  -> the answer can only be to its right
+ *   - middle is after `date`         -> it might be the answer; keep it, and
+ *                                       look for an earlier one to its left
+ *
+ * Each step throws away half of what is left, so n slots take about log2(n)
+ * steps instead of up to n. The loop ends when `low` and `high` meet, and that
+ * position is the first slot after `date` (or the end of the list).
+ *
+ * ISO dates ("2026-09-25") compare correctly as plain strings, because the
+ * year, month and day are written biggest-first with fixed widths.
+ */
+export function firstSlotAfter(slots: Slot[], date: string): string | null {
+  let low = 0;
+  let high = slots.length; // one past the end: "no slot after this date"
+
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (slots[middle]!.date <= date) {
+      low = middle + 1;
+    } else {
+      high = middle;
+    }
+  }
+
+  return low < slots.length ? slots[low]!.date : null;
+}
+
+/**
  * Check every assessment against the plan and return the ones that must move.
  *
  * @param sessions     the plan that was just generated
@@ -80,7 +114,7 @@ export function validateAssessmentDates(
     if (assessment.date >= coversUntil) continue;
 
     // Otherwise push it to the first class date strictly after that.
-    const newDate = slots.find((s) => s.date > coversUntil!)?.date;
+    const newDate = firstSlotAfter(slots, coversUntil);
     if (!newDate) continue; // no class left to move it to; the deficit screen handles this
 
     const topicName = lastTopicId ? (topicTitles.get(lastTopicId) ?? "a topic") : "a topic";

@@ -13,7 +13,7 @@ import assert from "node:assert/strict";
 import { generateSlots, suggestMakeupDates } from "../src/planner/slots.ts";
 import { allocateTopics, calculateDeficit } from "../src/planner/allocate.ts";
 import type { PlannerTopic } from "../src/planner/allocate.ts";
-import { validateAssessmentDates } from "../src/planner/assessments.ts";
+import { validateAssessmentDates, firstSlotAfter } from "../src/planner/assessments.ts";
 
 // ---------------------------------------------------------------- helpers
 
@@ -251,6 +251,27 @@ test("an assessment with no date or no topics is ignored", () => {
 });
 
 // ------------------------------------------------- 3.5 makeup suggestions
+
+test("firstSlotAfter finds the next class date by binary search", () => {
+  const slots = generateSlots("2026-09-01", "2026-09-30", ["mon", "wed"], []);
+  // Mondays and Wednesdays: 2, 7, 9, 14, 16, 21, 23, 28, 30 Sep.
+
+  assert.equal(firstSlotAfter(slots, "2026-08-15"), "2026-09-02", "before every slot -> the first one");
+  assert.equal(firstSlotAfter(slots, "2026-09-10"), "2026-09-14", "between two slots");
+  assert.equal(firstSlotAfter(slots, "2026-09-14"), "2026-09-16", "ON a slot -> strictly the next one");
+  assert.equal(firstSlotAfter(slots, "2026-09-30"), null, "on the last slot -> nothing after");
+  assert.equal(firstSlotAfter([], "2026-09-10"), null, "no slots at all");
+});
+
+test("firstSlotAfter agrees with a plain left-to-right search on every date", () => {
+  const slots = generateSlots("2026-09-01", "2026-12-31", ["tue", "thu"], ["2026-10-01"]);
+  const linear = (date: string) => slots.find((s) => s.date > date)?.date ?? null;
+
+  for (let day = 0; day < 140; day++) {
+    const date = new Date(Date.UTC(2026, 7, 20 + day)).toISOString().slice(0, 10);
+    assert.equal(firstSlotAfter(slots, date), linear(date), date);
+  }
+});
 
 test("makeup dates avoid normal class days, Sundays and holidays", () => {
   const dates = suggestMakeupDates("2026-09-01", "2026-09-30", ["mon", "wed"], ["2026-09-04"], 3);

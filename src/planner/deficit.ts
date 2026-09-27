@@ -65,32 +65,154 @@ export function buildDeficitOptions(
 }
 
 /**
- * DROP — remove whole topics, cheapest first.
+ * How bad a set of dropped topics is, compared like words in a dictionary:
+ * the first number decides, and the next one only breaks a tie.
  *
- * "Cheapest" means lowest priority; between two topics of equal priority, the
- * later one in the course goes first, because earlier topics tend to be
- * foundations for the ones after them.
+ *   [ high topics dropped, normal topics dropped, low topics dropped, -sum of order_no ]
+ *
+ * So a plan that drops no high-priority topic always beats one that drops any,
+ * then the same for normal, then fewer low topics wins. The last number prefers
+ * LATER topics, because earlier ones tend to be foundations for what follows.
+ * It is negative because a larger order_no sum is better and smaller costs win.
+ */
+type DropCost = [high: number, normal: number, low: number, negOrderSum: number];
+
+/** Is cost `a` strictly better (smaller) than cost `b`? */
+function isBetter(a: readonly number[], b: readonly number[]): boolean {
+  for (let k = 0; k < a.length; k++) {
+    if (a[k]! !== b[k]!) return a[k]! < b[k]!;
+  }
+  return false;
+}
+
+/** The cost of adding one more topic to a set that already costs `base`. */
+function addTopic(base: DropCost, t: PlannerTopic): DropCost {
+  const [high, normal, low, negOrderSum] = base;
+  return [
+    high + (t.priority === "high" ? 1 : 0),
+    normal + (t.priority === "normal" ? 1 : 0),
+    low + (t.priority === "low" ? 1 : 0),
+    negOrderSum - t.order_no,
+  ];
+}
+
+/**
+ * DROP — remove whole topics, choosing the best COMBINATION.
+ *
+ * This is the 0/1 knapsack problem: each topic is either dropped completely or
+ * kept completely (0 or 1), each frees a known number of classes (its "weight"),
+ * and the chosen topics must free at least `deficit` classes, as cheaply as
+ * possible. "Cheaply" is defined by DropCost above.
+ *
+ * Why not simply take the least important topics one by one (greedy)? Because
+ * that can drop more than needed. Short by 3, with low-priority topics of 2, 2
+ * and 3 classes: greedy takes 2 + 2 (two topics, one class too many), while
+ * dropping the 3-class topic alone is exact. Greedy never goes back on a choice.
+ *
+ * Dynamic programming solves it by filling a table from small cases up:
+ *
+ *   best[i][s] = the cheapest way to free EXACTLY s classes using only the
+ *                first i topics (null when it cannot be done)
+ *
+ * Each cell has just two choices for topic i — skip it, or drop it on top of
+ * the best way to free the remaining s - weight classes:
+ *
+ *   best[i][s] = better of  best[i-1][s]                      (skip topic i)
+ *                           best[i-1][s - weight] + topic i   (drop topic i)
+ *
+ * The answer is the cheapest cell in the last row with s >= deficit; between
+ * equally cheap cells the smaller s wins, so the fewest extra classes are lost.
+ *
+ * Time and memory: O(n x S), where n is the number of remaining topics and S is
+ * the total classes they need. A semester has a few dozen of each.
  */
 function buildDrop(deficit: number, topics: PlannerTopic[]): DropOption {
+  // Most droppable first (lowest priority, then latest in the course). The DP
+  // does not need this order to be correct; it only fixes the order the chosen
+  // topics are listed in for the teacher.
   const candidates = [...topics].sort((a, b) => {
     const byPriority = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
     return byPriority !== 0 ? byPriority : b.order_no - a.order_no;
   });
 
-  const chosen: DropOption["topics"] = [];
-  let recovered = 0;
+  const n = candidates.length;
+  const weight = candidates.map((t) => Math.max(1, t.sessions_needed));
+  const totalClasses = weight.reduce((sum, w) => sum + w, 0);
 
-  for (const t of candidates) {
-    if (recovered >= deficit) break;
-    const freed = Math.max(1, t.sessions_needed);
-    chosen.push({ topic_id: t.id, title: t.title, sessions_freed: freed });
-    recovered += freed;
+  // best[i][s] as described above. took[i][s] remembers whether topic i was
+  // dropped to reach that cell, so the chosen set can be read back afterwards.
+  const best: (DropCost | null)[][] = [];
+  const took: boolean[][] = [];
+
+  // Row 0, no topics yet: only "free 0 classes" is possible, and it costs nothing.
+  best.push(Array.from({ length: totalClasses + 1 }, (_, s) => (s === 0 ? [0, 0, 0, 0] : null)));
+  took.push(new Array(totalClasses + 1).fill(false));
+
+  for (let i = 1; i <= n; i++) {
+    const topic = candidates[i - 1]!;
+    const w = weight[i - 1]!;
+    const previous = best[i - 1]!;
+    const row: (DropCost | null)[] = [];
+    const tookRow: boolean[] = [];
+
+    for (let s = 0; s <= totalClasses; s++) {
+      const skip = previous[s] ?? null;
+      const before = s >= w ? previous[s - w] : null;
+      const drop = before ? addTopic(before, topic) : null;
+
+      if (drop && (!skip || isBetter(drop, skip))) {
+        row.push(drop);
+        tookRow.push(true);
+      } else {
+        row.push(skip);
+        tookRow.push(false);
+      }
+    }
+
+    best.push(row);
+    took.push(tookRow);
   }
+
+  // Pick the cheapest reachable total that covers the deficit. Walking s upwards
+  // and replacing only on a strictly better cost means a tie keeps the smaller s.
+  let target: number | null = null;
+  for (let s = Math.max(0, deficit); s <= totalClasses; s++) {
+    const cost = best[n]![s];
+    if (!cost) continue;
+    if (target === null || isBetter(cost.slice(0, 3), best[n]![target]!.slice(0, 3))) {
+      target = s;
+    }
+  }
+
+  // Not even dropping everything covers the deficit: offer everything and say so.
+  if (target === null) {
+    return {
+      type: "drop",
+      sessions_recovered: totalClasses,
+      covers_deficit: false,
+      topics: candidates.map((t, i) => ({ topic_id: t.id, title: t.title, sessions_freed: weight[i]! })),
+    };
+  }
+
+  // Walk back up the table to find which topics made up the winning cell.
+  const dropped = new Set<number>();
+  let s = target;
+  for (let i = n; i >= 1; i--) {
+    if (took[i]![s]) {
+      dropped.add(i - 1);
+      s -= weight[i - 1]!;
+    }
+  }
+
+  const chosen: DropOption["topics"] = [];
+  candidates.forEach((t, i) => {
+    if (dropped.has(i)) chosen.push({ topic_id: t.id, title: t.title, sessions_freed: weight[i]! });
+  });
 
   return {
     type: "drop",
-    sessions_recovered: recovered,
-    covers_deficit: recovered >= deficit,
+    sessions_recovered: target,
+    covers_deficit: target >= deficit,
     topics: chosen,
   };
 }

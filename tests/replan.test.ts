@@ -353,6 +353,102 @@ test("drop picks the lowest-priority topics first", () => {
   assert.equal(options.drop.covers_deficit, true);
 });
 
+test("drop finds one topic where greedy would have dropped two", () => {
+  // Short by 3. Greedy (least important first, later topics first) would take
+  // Topic 5 then Topic 4: two topics and 4 classes. Topic 3 alone is exact.
+  const topics = [
+    topic({ id: 3, order_no: 3, sessions_needed: 3, priority: "low" }),
+    topic({ id: 4, order_no: 4, sessions_needed: 2, priority: "low" }),
+    topic({ id: 5, order_no: 5, sessions_needed: 2, priority: "low" }),
+  ];
+  const options = buildDeficitOptions(3, topics, []);
+
+  assert.deepEqual(options.drop.topics.map((t) => t.topic_id), [3]);
+  assert.equal(options.drop.sessions_recovered, 3);
+  assert.equal(options.drop.covers_deficit, true);
+});
+
+test("drop never cuts a more important topic when less important ones cover it", () => {
+  // One normal topic would cover it alone, but three low ones also can.
+  const topics = [
+    topic({ id: 1, order_no: 1, sessions_needed: 3, priority: "normal" }),
+    topic({ id: 2, order_no: 2, sessions_needed: 1, priority: "low" }),
+    topic({ id: 3, order_no: 3, sessions_needed: 1, priority: "low" }),
+    topic({ id: 4, order_no: 4, sessions_needed: 1, priority: "low" }),
+  ];
+  const options = buildDeficitOptions(3, topics, []);
+
+  assert.deepEqual(options.drop.topics.map((t) => t.topic_id).sort(), [2, 3, 4]);
+});
+
+test("between equal choices, drop prefers later topics", () => {
+  const topics = [
+    topic({ id: 1, order_no: 1, sessions_needed: 2, priority: "low" }),
+    topic({ id: 2, order_no: 2, sessions_needed: 2, priority: "low" }),
+  ];
+  const options = buildDeficitOptions(2, topics, []);
+
+  assert.deepEqual(options.drop.topics.map((t) => t.topic_id), [2]);
+});
+
+test("drop reports honestly when even dropping everything is not enough", () => {
+  const topics = [
+    topic({ id: 1, order_no: 1, sessions_needed: 2, priority: "low" }),
+    topic({ id: 2, order_no: 2, sessions_needed: 1, priority: "high" }),
+  ];
+  const options = buildDeficitOptions(5, topics, []);
+
+  assert.equal(options.drop.covers_deficit, false);
+  assert.equal(options.drop.sessions_recovered, 3);
+  assert.equal(options.drop.topics.length, 2);
+});
+
+test("drop matches trying every combination, on hundreds of random cases", () => {
+  // The DP is only worth having if it is right. For small inputs we can afford
+  // to try every possible set of topics (2^n of them) and keep the best by the
+  // same rules, then check the DP found an equally good one.
+  const priorities = ["low", "normal", "high"] as const;
+  let seed = 42;
+  const random = (max: number) => {
+    seed = (seed * 1103515245 + 12345) % 2147483648; // fixed seed: same cases every run
+    return seed % max;
+  };
+
+  // [high, normal, low, classes freed]: smaller is better, first number first.
+  const score = (set: PlannerTopic[]) => {
+    const count = (p: string) => set.filter((t) => t.priority === p).length;
+    const freed = set.reduce((sum, t) => sum + t.sessions_needed, 0);
+    return [count("high"), count("normal"), count("low"), freed];
+  };
+  const smaller = (a: number[], b: number[]) => {
+    for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) return a[k]! < b[k]!;
+    return false;
+  };
+
+  for (let round = 0; round < 500; round++) {
+    const n = 1 + random(7);
+    const topics = Array.from({ length: n }, (_, i) =>
+      topic({ id: i + 1, order_no: i + 1, sessions_needed: 1 + random(4), priority: priorities[random(3)]! }),
+    );
+    const total = topics.reduce((sum, t) => sum + t.sessions_needed, 0);
+    const deficit = 1 + random(total);
+
+    let bestScore: number[] | null = null;
+    for (let mask = 0; mask < 1 << n; mask++) {
+      const set = topics.filter((_, i) => mask & (1 << i));
+      const s = score(set);
+      if (s[3]! < deficit) continue;
+      if (!bestScore || smaller(s, bestScore)) bestScore = s;
+    }
+
+    const options = buildDeficitOptions(deficit, topics, []);
+    const picked = topics.filter((t) => options.drop.topics.some((d) => d.topic_id === t.id));
+
+    assert.deepEqual(score(picked), bestScore, `round ${round}: deficit ${deficit}, ${JSON.stringify(topics)}`);
+    assert.equal(options.drop.covers_deficit, true);
+  }
+});
+
 test("compress never takes a topic below its minimum", () => {
   const options = buildDeficitOptions(4, remaining, []);
 
