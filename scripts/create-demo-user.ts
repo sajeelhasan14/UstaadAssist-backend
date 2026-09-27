@@ -44,7 +44,9 @@ const response = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
   }),
 });
 
-const body = await response.json();
+// fetch gives back `unknown`, so the shape we rely on is stated here rather
+// than assumed. Only these three fields are read.
+const body = (await response.json()) as { id?: string; msg?: string };
 
 if (!response.ok) {
   // A user that already exists is not a failure worth stopping for.

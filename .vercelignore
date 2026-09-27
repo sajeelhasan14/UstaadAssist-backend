@@ -1,0 +1,4 @@
+# Nothing here is needed to answer a request, so keep it out of the upload.
+docs/
+tests/
+migrations/
