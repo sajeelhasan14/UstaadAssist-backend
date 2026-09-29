@@ -69,11 +69,6 @@ check 200 GET  /health
 check 200 GET  /auth/me
 
 echo ""
-echo "the contract itself (no token needed - the app team reads these first)"
-check 200 GET  /openapi.json
-check 200 GET  /docs/
-
-echo ""
 echo "rejections (these SHOULD fail)"
 # No token at all.
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/auth/me")
@@ -90,7 +85,7 @@ check 404 GET  /courses/999999
 check 400 PUT  "/courses/$COURSE/weightage" '{"quiz":10,"final":10}'
 # A body that is not valid JSON must be a 400, not a 500.
 check 400 POST "/courses/$COURSE/materials" '{"title": broken}'
-# Schema validation, from the same contract that generates the docs.
+# Bad input is refused by the route or service that receives it.
 check 400 PATCH "/courses/$COURSE" '{}'
 check 400 POST "/courses" '{"name":"X","start_date":"01-09-2026","end_date":"2026-12-18","class_days":["mon"]}'
 check 400 POST "/courses/$COURSE/assessments" '{"type":"pop-quiz","title":"X","total_marks":10}'
@@ -163,9 +158,9 @@ check 200 GET  "/courses/$COURSE/reports/course?today=2026-11-18"
 check 503 GET  "/courses/$COURSE/reports/result.pdf"
 
 echo ""
-echo "not-yet-configured extraction (503 is correct)"
-check 503 POST "/courses/$COURSE/students/extract" '{"storage_path":"demo/class-list.jpg"}'
-check 503 POST "/courses/$COURSE/outline/import"   '{"storage_path":"demo/outline.pdf"}'
+echo "extraction refuses a file outside the teacher's own folder (400 is correct)"
+check 400 POST "/courses/$COURSE/students/extract" '{"storage_path":"demo/class-list.jpg"}'
+check 400 POST "/courses/$COURSE/outline/import"   '{"storage_path":"demo/outline.pdf"}'
 
 echo ""
 echo "  $pass passed, $fail failed"

@@ -15,9 +15,8 @@
  *     uploaded. The code only ever reads process.env, so nothing changes.
  *
  *   * Module-level work runs once per COLD START, not once per request. The
- *     OpenAPI document and the database pool are both built at module level, so
- *     a warm function reuses them and only the first request after an idle
- *     period pays for them.
+ *     database pool is built at module level, so a warm function reuses it and
+ *     only the first request after an idle period pays for it.
  */
 
 import app from "../src/app.ts";

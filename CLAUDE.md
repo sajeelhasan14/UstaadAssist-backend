@@ -48,7 +48,7 @@ If a feature you are building would require the teacher to type a lot, stop and 
 | Language | **TypeScript.** Run directly by Node 22 via `--experimental-strip-types` — no build step, no `dist/`. `tsc --noEmit` type-checks only; it never emits. |
 | Database | PostgreSQL |
 | DB access | **Raw SQL via `pg`. No ORM. No Prisma, no Sequelize, no Knex.** |
-| Validation & API docs | Zod schema per endpoint → OpenAPI → Swagger UI at `/docs`. One definition yields request validation, TS types (`z.infer`), the docs, and the mock server. |
+| Validation | Each route or service checks its own input and throws `badRequest`; database constraints are the last line. No schema library. (Zod + Swagger were removed on 29 Sep 2026 to reduce complexity.) |
 | Testing | Node's built-in `node:test`. No Jest, no Vitest. |
 | Auth | Supabase Auth |
 | File storage | Supabase Storage |
@@ -63,7 +63,7 @@ If a feature you are building would require the teacher to type a lot, stop and 
 - **Do not upload files through Express.** The app uploads directly to a Supabase Storage bucket and sends the returned path to the API, which saves it in the `material` table.
 - No secrets in the repo. `.env` is gitignored, and `.env.example` lists the keys.
 - **Dev tooling uses Node 22 built-ins.** `--watch` instead of `nodemon`, `--env-file` instead of `dotenv`. Do not add either package.
-- **The approved dependency list is closed.** Runtime: `express`, `pg`, `jose`, `zod`, `@asteasolutions/zod-to-openapi`, `swagger-ui-express`, `unpdf`, `tesseract.js` (the last two for document extraction, approved by the project owner). Dev: `typescript`, `@types/*`. Anything else needs asking first.
+- **The approved dependency list is closed.** Runtime: `express`, `pg`, `jose`, `unpdf`, `tesseract.js` (the last two for document extraction, approved by the project owner). Dev: `typescript`, `@types/*`. Anything else needs asking first.
 - The Supabase service role key lives on the server only. Never in the React Native app.
 
 ---
@@ -235,8 +235,6 @@ DELETE /materials/:id                    delete one material record (the app del
 GET    /courses/:id/dashboard            every dashboard number in one response
 GET    /courses/:id/reports/:type.pdf    generate and return a report
 
-GET    /docs                             Swagger UI — generated, never hand-written
-GET    /openapi.json                     the OpenAPI spec, generated from the Zod schemas
 ```
 
 Every field name in requests and responses uses `snake_case`, matching the database columns, so no mapping layer exists between SQL and JSON. *(Pending final confirmation.)*
@@ -305,9 +303,8 @@ This changes the weight of one existing rule: **endpoint names and field names a
 
 How the two tracks stay in sync:
 
-- The **Swagger UI at `/docs`** is the contract. It is generated from the Zod schemas, so it cannot drift from the code. There is no separate document to keep updated.
-- The mobile track builds against a **mock server** generated from the same OpenAPI spec, then switches one base URL when the real endpoint lands.
+- The endpoint list in Section 4 is the contract. The request and response shapes are described to the app team directly (there is no generated Swagger page).
 - If the app needs a field that does not exist, it is requested and added. It is never invented on the client.
-- **Weekly integration checkpoint:** the app runs against the real backend, not the mock.
+- **Weekly integration checkpoint:** the app runs against the real backend.
 
 What the mobile track can build with no backend at all: the design system, navigation, Supabase sign-in and session persistence, and every screen layout. Supabase Auth runs in the app and does not touch Express.

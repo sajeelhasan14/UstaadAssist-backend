@@ -107,9 +107,6 @@ curl https://<your-app>.vercel.app/health
 # 2. The database is reachable. 401 is the RIGHT answer here — it proves the
 #    route ran and the auth middleware rejected a missing token.
 curl -i https://<your-app>.vercel.app/courses
-
-# 3. The docs. Open this in a browser.
-open https://<your-app>.vercel.app/docs
 ```
 
 Expected:
@@ -149,7 +146,6 @@ same Supabase database:
 | `psql ... -f migrations/*.sql` | Migrations are applied by hand, deliberately |
 | `npm run seed` | A CLI script that builds the demo semester |
 | `npm run create-demo-user` | An administrative job, done once |
-| `npm run openapi` | Writes `docs/openapi.json` for the app team |
 
 So the order for a fresh database is: run the migrations locally, seed it
 locally, *then* deploy. The deployment only serves requests.
@@ -188,7 +184,7 @@ Local development is unchanged.
 {
   "rewrites": [{ "source": "/(.*)", "destination": "/api" }],
   "functions": {
-    "api/index.ts": { "includeFiles": "node_modules/swagger-ui-dist/**" }
+    "api/index.ts": { "includeFiles": "node_modules/{tesseract.js,tesseract.js-core}/**" }
   }
 }
 ```
@@ -196,10 +192,10 @@ Local development is unchanged.
 `rewrites` sends every URL to the one function, and Express routes from there
 exactly as it does locally.
 
-`includeFiles` is the fix for a specific problem: `swagger-ui-express` serves its
-CSS and JavaScript from `node_modules/swagger-ui-dist` through a path built at
-runtime, and Vercel's file tracer cannot see that, so those files get left out and
-`/docs` renders as an unstyled blank page. This forces them in.
+`includeFiles` is the fix for a specific problem: `tesseract.js` (the OCR that
+reads class-list photos) loads some of its files through a path built at runtime,
+and Vercel's file tracer cannot see that, so those files get left out and photo
+extraction fails. This forces them in.
 
 ### The pool knows it is serverless
 
@@ -218,12 +214,6 @@ connection each, and ten instances use ten connections rather than a hundred.
 ---
 
 ## When something is wrong
-
-### `/docs` loads but is a blank white page
-
-The Swagger assets were not included. Check `vercel.json` still has the
-`includeFiles` line, and that the deployment picked it up — `vercel.json` changes
-need a redeploy.
 
 ### Every request returns `FUNCTION_INVOCATION_FAILED`, even `/health`
 
@@ -293,7 +283,6 @@ Adding it means the `cors` package, which is outside the closed dependency list 
 CLAUDE.md, so it needs a decision rather than a commit.
 
 **Consider whether this should be public at all.** A deployed backend is reachable
-by anyone who finds the URL. Every endpoint except `/health`, `/docs` and
-`/openapi.json` requires a valid Supabase token, and every query is scoped to the
-teacher in that token — so data is protected. But the documentation is open, which
-is intentional for your team and worth being aware of.
+by anyone who finds the URL. Every endpoint except `/health` requires a valid
+Supabase token, and every query is scoped to the teacher in that token — so data
+is protected.

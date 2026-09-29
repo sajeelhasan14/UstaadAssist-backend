@@ -11,27 +11,22 @@
     "typecheck": "tsc --noEmit",
     "seed": "node --experimental-strip-types --env-file=.env scripts/seed.ts",
     "create-demo-user": "node --experimental-strip-types --env-file=.env scripts/create-demo-user.ts",
-    "smoke": "bash scripts/smoke.sh",
-    "openapi": "node --experimental-strip-types scripts/export-openapi.ts"
+    "smoke": "bash scripts/smoke.sh"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@asteasolutions/zod-to-openapi": "^9.1.0",
     "express": "^5.2.1",
     "jose": "^6.2.12",
     "pg": "^8.23.0",
-    "swagger-ui-express": "^5.0.1",
     "tesseract.js": "^7.0.0",
-    "unpdf": "^1.8.1",
-    "zod": "^4.6.5"
+    "unpdf": "^1.8.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.3",
     "@types/pg": "^8.23.1",
-    "@types/swagger-ui-express": "^4.1.8",
     "typescript": "^5.9.3"
   },
   "engines": {

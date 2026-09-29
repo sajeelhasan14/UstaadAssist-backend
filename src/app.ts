@@ -24,11 +24,8 @@
 import "./env.ts";
 
 import express from "express";
-import swaggerUi from "swagger-ui-express";
 import { ok } from "./http.ts";
 import { errorHandler, notFoundHandler } from "./middleware/error.ts";
-import { validateAgainstContract } from "./middleware/validate.ts";
-import { buildDocument } from "./openapi/document.ts";
 
 import authRoutes from "./routes/auth.ts";
 import courseRoutes from "./routes/courses.ts";
@@ -41,14 +38,6 @@ import materialRoutes from "./routes/materials.ts";
 
 const app = express();
 
-/**
- * Behind Vercel (or any proxy) the client's real address arrives in the
- * X-Forwarded-For header. Trusting it makes req.ip correct instead of always
- * reporting the proxy. Nothing depends on this yet; it is here so that anything
- * added later which logs or rate-limits by address is right from the start.
- */
-app.set("trust proxy", 1);
-
 // Turns the JSON body of a request into req.body. Without it, req.body is
 // undefined and every POST looks empty.
 app.use(express.json());
@@ -59,49 +48,6 @@ app.use(express.json());
 app.get("/health", (_req, res) => {
   ok(res, { status: "ok" });
 });
-
-/**
- * The API documentation.
- *
- * Built once when this module loads, from src/openapi/contract.ts, which is the
- * same definition request validation reads. So the docs cannot drift from the
- * code — there is no second place to update. CLAUDE.md: "generated, never
- * hand-written".
- *
- * These two are mounted before the validator and the routers because they are
- * the contract itself, and they need no token: the mobile team has to be able to
- * read them before they can sign in.
- */
-const openApiDocument = buildDocument();
-
-app.get("/openapi.json", (_req, res) => {
-  res.json(openApiDocument);
-});
-
-app.use(
-  "/docs",
-  swaggerUi.serve,
-  swaggerUi.setup(openApiDocument, {
-    customSiteTitle: "UstaadAssist API",
-    swaggerOptions: {
-      // Keep the sidebar usable: 40 operations collapsed by tag rather than all
-      // expanded, and a filter box for finding one quickly.
-      docExpansion: "list",
-      filter: true,
-      persistAuthorization: true,
-      tryItOutEnabled: true,
-    },
-  }),
-);
-
-/**
- * Checks the body and query of every documented request against its schema.
- *
- * Mounted here — after express.json() so there is a body to check, and before
- * the routers so a malformed request never reaches a service. One insertion
- * point for all 40 endpoints.
- */
-app.use(validateAgainstContract);
 
 app.use("/auth", authRoutes);
 

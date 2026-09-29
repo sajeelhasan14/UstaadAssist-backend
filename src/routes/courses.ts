@@ -46,6 +46,10 @@ router.post("/", requireAuth, async (req, res) => {
   if (!start_date || !end_date) {
     throw badRequest("start_date and end_date are required");
   }
+  // Without this, Postgres would quietly read "01-09-2026" as 9 January.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start_date) || !/^\d{4}-\d{2}-\d{2}$/.test(end_date)) {
+    throw badRequest("start_date and end_date must be in YYYY-MM-DD form");
+  }
   if (!Array.isArray(class_days) || class_days.length === 0) {
     throw badRequest("class_days must be a non-empty array");
   }
@@ -84,7 +88,7 @@ router.post("/", requireAuth, async (req, res) => {
       );
     }
 
-    // numeric arrives from pg as a string ("75.00"); the contract says number.
+    // numeric arrives from pg as a string ("75.00"); the app expects a number.
     return { ...newCourse, attendance_threshold: Number(newCourse.attendance_threshold) };
   });
 

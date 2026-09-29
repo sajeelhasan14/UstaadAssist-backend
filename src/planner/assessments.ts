@@ -30,8 +30,7 @@ export type AssessmentMove = {
 /** "2026-09-25" -> "25 Sep" */
 function pretty(iso: string): string {
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const [y, m, d] = iso.split("-").map(Number);
-  void y;
+  const [, m, d] = iso.split("-").map(Number);
   return `${d} ${months[(m ?? 1) - 1]}`;
 }
 

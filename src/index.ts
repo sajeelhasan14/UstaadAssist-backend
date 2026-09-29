@@ -15,5 +15,4 @@ const PORT = Number(process.env.PORT ?? 4000);
 
 app.listen(PORT, () => {
   console.log(`Listening on http://localhost:${PORT}`);
-  console.log(`Docs at      http://localhost:${PORT}/docs`);
 });

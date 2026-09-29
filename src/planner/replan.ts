@@ -73,7 +73,6 @@ function remainingWork(topics: PlannerTopic[], conducted: ExistingSession[]): Pl
 
   const still: PlannerTopic[] = [];
   for (const t of topics) {
-    if (t.priority === undefined) continue;
     const done = taught.get(t.id) ?? 0;
     const left = Math.max(1, t.sessions_needed) - done;
     if (left > 0) still.push({ ...t, sessions_needed: left });
